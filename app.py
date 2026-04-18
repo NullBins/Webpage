@@ -5,8 +5,7 @@ from flask import Flask, request, render_template, redirect, session
 
 app = Flask(__name__)
 app.secret_key = "key"
-encode_user = None
-admin_pw = base64.b64encode("admin".encode('utf-8'))
+admin_pw = base64.b64encode("admin".encode('utf-8')).decode('utf-8')
 
 # ============================================
 #  DataBase
@@ -34,7 +33,11 @@ else:
 # ============================================
 @app.route('/')
 def index():
-    username = session.get('username') # 세션에 username 있다면 가져와서 username에 저장
+    session_username = session.get('username')
+    if session_username:
+        username = base64.b64decode(session_username).decode('utf-8') # 세션에 username 있다면 가져와서 username에 저장
+    else:
+        username = None
     flag = None # flag 변수 생성
     if username == 'admin': # 세션 username이 admin이면
         db = sqlite3.connect('users.db') # db 접속해서
@@ -55,12 +58,11 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         db = sqlite3.connect('users.db')
-        user_query = db.execute("SELECT * FROM users WHERE username = ? AND username = ?", (username, password))
+        user_query = db.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
         user = user_query.fetchone()
         db.close()
         if user:
-            encode_user = base64.b64encode(username.encode('utf-8'))
-            session['username'] = encode_user
+            session['username'] = base64.b64encode(username.encode('utf-8')).decode('utf-8')
             return redirect('/')
         else:
             return render_template('login.html', error="ID or PW is incorrect")
@@ -84,7 +86,7 @@ def signup():
         user_query = db.execute("SELECT * FROM users WHERE username = ?", (username,)) # 존재하는 유저 확인 쿼리
         if user_query.fetchone(): # 존재한다면
             db.close() # db 접근 종료하고
-            return render_template('signup.html', error="ID alreay exists") # 가입 못하게 에러 띄우기
+            return render_template('signup.html', error="ID alreay exists (session secret key: 'key')") # 가입 못하게 에러 띄우기
         db.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
         db.commit() # 전부 아니면 위 INSERT 문으로 db 저장 및 commit
         db.close() # db 종료
