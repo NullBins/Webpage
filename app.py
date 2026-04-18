@@ -1,10 +1,12 @@
 import sqlite3
 import os
+import base64
 from flask import Flask, request, render_template, redirect, session
 
 app = Flask(__name__)
-app.secret_key = os.urandom(32).hex()
-admin_pw = os.urandom(32).hex()
+app.secret_key = "key"
+encode_user = None
+admin_pw = base64.b64encode("admin".encode('utf-8'))
 
 # ============================================
 #  DataBase
@@ -15,6 +17,12 @@ if not os.path.exists("users.db"):
     db.execute("CREATE TABLE flag (id INTEGER PRIMARY KEY, value TEXT)")
     db.execute("INSERT INTO users (username, password) VALUES ('admin', ?)", (admin_pw,))
     db.execute("INSERT INTO flag (value) VALUES (?)", ("FLAG{" + os.urandom(32).hex() + "}",))
+    db.commit()
+    db.close()
+else:
+    db = sqlite3.connect("users.db")
+    db.execute("DELETE FROM users WHERE username = 'admin'")
+    db.execute("INSERT INTO users (username, password) VALUES ('admin', ?)", (admin_pw,))
     db.commit()
     db.close()
 
@@ -51,7 +59,8 @@ def login():
         user = user_query.fetchone()
         db.close()
         if user:
-            session['username'] = username
+            encode_user = base64.b64encode(username.encode('utf-8'))
+            session['username'] = encode_user
             return redirect('/')
         else:
             return render_template('login.html', error="ID or PW is incorrect")
